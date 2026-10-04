@@ -38,7 +38,7 @@ Shell variables do not survive between commands or reach workers. In every brief
 
 3. **Final checks.** Run `bash <run>/checks.sh > <run>/final.txt 2>&1`, then `<harden> new-failures <run>/checks.expected <run>/baseline.txt <run>/final.txt`. Done when it exits 0 or 2. Exit 3 means the checks did not all run, which is never a pass. An `UNRESOLVED` line means a check failed before and after the run, and the run cannot tell whether it got worse. Report it as unresolved, never as "no regression".
 
-**Reply:** one row per stage with findings in, applied, open, considered and dismissed, grouped by pass. Then the QA result per pass, the check status with any `UNRESOLVED` checks, and every `open` and `consider` finding in plain words. Give the run directory path so the user can read the ledger.
+**Reply:** one row per stage with findings in, applied, open, considered and dismissed, grouped by pass. Then the QA result per pass, the check status with any `UNRESOLVED` checks, and every `open` and `consider` finding in plain words. Then list the QA open investigations under their own heading. They are observations QA could not explain, not confirmed defects, so keep them apart from the review findings. Give the run directory path so the user can read the ledger.
 
 #### Feature-list worker
 
@@ -47,9 +47,9 @@ The QA worker never reads code, so this list decides what QA covers. A spec, com
 Start a new worker. Brief it: "Read `git diff <base>...HEAD`, the spec source `<spec source>` and the commit messages. Find every change in behavior that a user or an API caller could observe. Include rules that change with no screen change, such as a new limit, a new permission or a changed default. Write two files.
 
 - `<run>/features.md` is for the QA worker. For each behavior, say what a user can now do or what now happens, where in the app to see it, and the expected result. Describe behavior only. Write no file names, function names or code. If the branch changes no observable behavior, say so.
-- `<run>/features.coverage.md` is for the orchestrator. List every changed file that has runtime behavior. Map it to the features it affects, or give the reason it has no observable behavior."
+- `<run>/features.coverage.md` is for the orchestrator. Write one line for every file in `git diff --name-only <base>...HEAD`, in the form `<path> -> <features it affects>`. For a file with no observable behavior, write `<path> -> none: <reason>`."
 
-When it returns, apply the status gate. Then check that every file in `features.coverage.md` maps to a feature or has a reason. If one does not, start a new feature-list worker with the gaps named.
+When it returns, apply the status gate. Then run `<harden> coverage-gaps <base> <run>/features.coverage.md`. It compares the coverage file with Git's own list of changed files. If it prints a `MISSING` line, start a new feature-list worker with those files named.
 
 #### Stage loop
 
@@ -64,6 +64,7 @@ Run these four steps for each stage. Start a new worker for each of steps A, B a
 - Make a worktree with `<harden> worktree-add <run> <stage>-produce`. Start a worker in that worktree with the producer brief. Tell it to run every command in the worktree.
 - When the worker returns, run `<harden> capture <run> <stage>-produce`. If the producer edited files, this saves every edit as a patch and prints its path, committed edits included. It always removes the worktree.
 - Apply the status gate.
+- For a QA stage, read the "Open investigations" section of the QA report, and log each one in the ledger.
 - If the status is `PASS` with 0 findings and no patch exists, log one ledger row and skip to the next stage.
 - Done when the status is `PASS` and the worktree is gone.
 

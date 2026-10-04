@@ -88,7 +88,7 @@ Done when every main check is `PASS`, `FAIL` or `NOT VERIFIED` with evidence. If
 
 Run every edge check from the charter. Start with the risk areas most likely to break.
 
-Keep exploration notes in `<output dir>/notes.md`. For each surprise, write what you observed, your hypothesis, and the next probe that tests it. Follow a surprise until you can explain it or reproduce it as a bug, for at most 5 probes. If it is still unexplained after 5, list it as an open investigation with your notes, and move on.
+Keep exploration notes in `<output dir>/notes.md`. For each surprise, write what you observed, your hypothesis, and the next probe that tests it. Follow a surprise until you can explain it or reproduce it as a bug, for at most 5 probes. If it is still unexplained after 5, list it as an open investigation with your notes, and move on. If the open investigation means you cannot tell whether a check passed, that check stays `NOT VERIFIED`.
 
 Done when every edge check is `PASS`, `FAIL` or `NOT VERIFIED` with evidence, and every surprise is explained, filed or listed as open.
 

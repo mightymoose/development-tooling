@@ -6,6 +6,7 @@
 #   harden.sh begin <run> <stage>                record HEAD before a stage applies commits
 #   harden.sh rollback <run> <stage>             revert every commit made since begin
 #   harden.sh recover <run> <stage>              stash unfinished edits, then roll back
+#   harden.sh coverage-gaps <base> <coverage>    list changed files with no feature mapping
 #   harden.sh new-failures <expected> <baseline> <current>
 #                                                compare two checks.sh runs
 #
@@ -13,6 +14,9 @@
 # A checks.sh run prints one "FAIL <check>::<test id>" line per failure,
 # and one "DONE <check> <exit code>" line after each check finishes.
 # "FAIL <check>::*" means the check failed and could not name its tests.
+# A coverage file holds one "<path> -> <features or 'none: reason'>" line per file.
+# coverage-gaps exits 0 when every file in git diff --name-only <base>...HEAD
+# has a non-empty mapping, 1 when one does not.
 # new-failures exits 0 clean, 1 new failure, 2 only unresolved, 3 incomplete run.
 set -euo pipefail
 
@@ -121,6 +125,22 @@ case "$cmd" in
     # 4. Report both.
     echo "stash: $stash"
     echo "reverted: ${reverted:-none}"
+    ;;
+
+  coverage-gaps)
+    [ $# -eq 2 ] || die "usage: coverage-gaps <base> <coverage>"
+    base=$1 coverage=$2
+    [ -r "$coverage" ] || die "cannot read $coverage"
+    status=0
+    while read -r file; do
+      [ -n "$file" ] || continue
+      mapping=$(awk -v f="$file" 'index($0, f " -> ") == 1 { print substr($0, length(f) + 5) }' "$coverage" | head -n 1)
+      if ! grep -q '[^[:space:]]' <<< "$mapping"; then
+        echo "MISSING $file"
+        status=1
+      fi
+    done < <(git diff --name-only "$base...HEAD")
+    exit $status
     ;;
 
   new-failures)

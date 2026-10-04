@@ -202,6 +202,35 @@ test_recover_with_clean_tree_makes_no_stash() {
   pass "recover with a clean tree makes no stash"
 }
 
+test_coverage_gaps_uses_git_file_list() {
+  start=$failures
+  local repo run base out status
+  repo=$(new_repo)
+  run="$repo/.git/mm-mode/harden/t"
+  mkdir -p "$run"
+  cd "$repo"
+  base=$(git rev-parse HEAD)
+  echo limit > rules.txt && echo page > page.txt && echo note > README.md
+  git add . && git commit --quiet -m change
+  printf 'page.txt -> checkout page shows the limit\nREADME.md -> none: docs only\n' > "$run/cov"
+  set +e; out=$("$HARDEN" coverage-gaps "$base" "$run/cov"); status=$?; set -e
+  [ $status -eq 1 ] || fail "omitted file not reported (status $status)"
+  grep -qxF 'MISSING rules.txt' <<< "$out" || fail "missing file not named"
+
+  printf 'page.txt -> checkout page shows the limit\nREADME.md -> none: docs only\nrules.txt ->\n' > "$run/cov"
+  set +e; out=$("$HARDEN" coverage-gaps "$base" "$run/cov"); status=$?; set -e
+  [ $status -eq 1 ] || fail "empty mapping accepted (status $status)"
+
+  printf 'page.txt -> checkout page shows the limit\nREADME.md -> none: docs only\nrules.txt -> payment over the limit is refused\n' > "$run/cov"
+  set +e; "$HARDEN" coverage-gaps "$base" "$run/cov" > /dev/null; status=$?; set -e
+  [ $status -eq 0 ] || fail "complete coverage not accepted (status $status)"
+
+  set +e; "$HARDEN" coverage-gaps "$base" "$run/nope" > /dev/null 2>&1; status=$?; set -e
+  [ $status -ne 0 ] && [ $status -ne 1 ] || fail "missing coverage file not an error (status $status)"
+  pass "coverage-gaps uses the git file list"
+}
+
+test_coverage_gaps_uses_git_file_list
 test_recover_stashes_edits_then_rolls_back
 test_recover_with_clean_tree_makes_no_stash
 test_capture_keeps_new_and_staged_files
