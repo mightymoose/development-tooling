@@ -94,29 +94,77 @@ test_new_failures() {
   start=$failures
   local dir out status
   dir=$(mktemp -d)
-  printf 'FAIL unit::checkout totals\nFAIL lint::*\n' > "$dir/base"
+  printf 'unit\nlint\ntypes\n' > "$dir/expected"
+  printf 'FAIL unit::checkout totals\nDONE unit 1\nFAIL lint::*\nDONE lint 1\nDONE types 0\n' > "$dir/base"
 
-  printf 'FAIL unit::checkout totals\nFAIL unit::refund rounding\nFAIL lint::*\n' > "$dir/cur"
-  set +e; out=$("$HARDEN" new-failures "$dir/base" "$dir/cur"); status=$?; set -e
+  printf 'FAIL unit::checkout totals\nFAIL unit::refund rounding\nDONE unit 1\nFAIL lint::*\nDONE lint 1\nDONE types 0\n' > "$dir/cur"
+  set +e; out=$("$HARDEN" new-failures "$dir/expected" "$dir/base" "$dir/cur"); status=$?; set -e
   [ $status -eq 1 ] || fail "new test failure not reported (status $status)"
   grep -qxF 'NEW unit::refund rounding' <<< "$out" || fail "new failure id missing"
 
-  printf 'FAIL unit::checkout totals\nFAIL lint::*\n' > "$dir/cur"
-  set +e; out=$("$HARDEN" new-failures "$dir/base" "$dir/cur"); status=$?; set -e
+  printf 'FAIL unit::checkout totals\nDONE unit 1\nFAIL lint::*\nDONE lint 1\nDONE types 0\n' > "$dir/cur"
+  set +e; out=$("$HARDEN" new-failures "$dir/expected" "$dir/base" "$dir/cur"); status=$?; set -e
   [ $status -eq 2 ] || fail "still-failing opaque check not unresolved (status $status)"
   grep -qxF 'UNRESOLVED lint::*' <<< "$out" || fail "unresolved line missing"
 
-  printf 'FAIL types::*\n' > "$dir/cur"
-  set +e; "$HARDEN" new-failures "$dir/base" "$dir/cur" > /dev/null; status=$?; set -e
+  printf 'DONE unit 0\nDONE lint 0\nFAIL types::*\nDONE types 1\n' > "$dir/cur"
+  set +e; "$HARDEN" new-failures "$dir/expected" "$dir/base" "$dir/cur" > /dev/null; status=$?; set -e
   [ $status -eq 1 ] || fail "newly failing opaque check not new (status $status)"
 
-  : > "$dir/cur"
-  set +e; "$HARDEN" new-failures "$dir/base" "$dir/cur" > /dev/null; status=$?; set -e
+  printf 'DONE unit 0\nDONE lint 0\nDONE types 0\n' > "$dir/cur"
+  set +e; "$HARDEN" new-failures "$dir/expected" "$dir/base" "$dir/cur" > /dev/null; status=$?; set -e
   [ $status -eq 0 ] || fail "clean run not clean (status $status)"
   pass "new-failures compares by test id"
 }
 
+test_capture_keeps_committed_edits() {
+  start=$failures
+  local repo run wt patch
+  repo=$(new_repo)
+  run="$repo/.git/mm-mode/harden/t"
+  mkdir -p "$run"
+  cd "$repo"
+  wt=$("$HARDEN" worktree-add "$run" p1-review)
+  echo committed > "$wt/a.txt"
+  git -C "$wt" commit --quiet -am "worker commit"
+  patch=$("$HARDEN" capture "$run" p1-review)
+  [ -n "$patch" ] && [ -f "$patch" ] || { fail "committed edit not captured"; return; }
+  grep -q '^+committed' "$patch" || fail "patch lost a committed edit"
+  pass "capture keeps committed edits"
+}
+
+test_new_failures_requires_complete_runs() {
+  start=$failures
+  local dir status
+  dir=$(mktemp -d)
+  printf 'unit\nlint\n' > "$dir/expected"
+  printf 'DONE unit 0\nDONE lint 0\n' > "$dir/base"
+
+  set +e; "$HARDEN" new-failures "$dir/expected" "$dir/base" "$dir/missing" > /dev/null 2>&1; status=$?; set -e
+  [ $status -eq 3 ] || fail "missing results file not incomplete (status $status)"
+
+  echo 'runner: command not found' > "$dir/cur"
+  set +e; "$HARDEN" new-failures "$dir/expected" "$dir/base" "$dir/cur" > /dev/null; status=$?; set -e
+  [ $status -eq 3 ] || fail "results with no completion records not incomplete (status $status)"
+
+: > "$dir/empty"
+  set +e; "$HARDEN" new-failures "$dir/empty" "$dir/base" "$dir/base" > /dev/null; status=$?; set -e
+  [ $status -eq 3 ] || fail "empty expected list not incomplete (status $status)"
+
+  printf 'DONE unit 0\n' > "$dir/cur"
+  set +e; "$HARDEN" new-failures "$dir/expected" "$dir/base" "$dir/cur" > /dev/null; status=$?; set -e
+  [ $status -eq 3 ] || fail "missing check record not incomplete (status $status)"
+
+  printf 'DONE unit 0\nDONE lint 1\n' > "$dir/cur"
+  set +e; out=$("$HARDEN" new-failures "$dir/expected" "$dir/base" "$dir/cur"); status=$?; set -e
+  [ $status -eq 1 ] || fail "non-zero exit with no FAIL lines not a failure (status $status)"
+  grep -qxF 'NEW lint::*' <<< "$out" || fail "non-zero exit not reported as lint::*"
+  pass "new-failures requires complete runs"
+}
+
 test_capture_keeps_new_and_staged_files
+test_capture_keeps_committed_edits
+test_new_failures_requires_complete_runs
 test_capture_without_edits_writes_nothing
 test_rollback_reverts_stage_and_repair_commits
 test_begin_refuses_dirty_tree
