@@ -17,6 +17,7 @@ Shell variables do not survive between commands or reach workers. In every brief
    - Find the base with `git merge-base HEAD origin/main`, or the repo's trunk. Record the SHA as `<base>`.
    - Make the run directory with `git rev-parse --path-format=absolute --git-path mm-mode/harden`, plus a timestamp folder. Record the absolute path as `<run>`. The directory lives inside `.git`, so nothing in it gets committed.
    - Find the spec: an issue number in the branch name or commit messages, or a spec file. If you find none, record "no spec".
+   - Write `<run>/features.md` for black-box QA. List each user-facing feature the branch adds or changes: what a user can now do, and where in the app to find it. Take it from the spec first, then the commit messages, then the names of changed routes and screens. Describe behavior only, with no file names, functions or code. If the branch has no user-facing feature, say so.
    - Find the check commands in the target repo: CLAUDE.md, AGENTS.md, package scripts, Makefile, pre-commit config, CI workflow. Pick the unit-test commands and every static check (lint, typecheck, format check).
    - Write `<run>/checks.sh`. It computes the changed files when it runs, with `git diff --name-only <base>...HEAD`, and scopes each check to them where the tool allows.
    - Write the check names, one per line, to `<run>/checks.expected`.
@@ -25,12 +26,12 @@ Shell variables do not survive between commands or reach workers. In every brief
    - Run `bash <run>/checks.sh > <run>/baseline.txt 2>&1`, then `<harden> new-failures <run>/checks.expected <run>/baseline.txt <run>/baseline.txt`. If it exits 3, the baseline is incomplete. Fix `checks.sh` and run it again. If it is still incomplete, stop and report.
    - The baseline failures existed before the run started. They did not necessarily exist before the branch.
    - Start `<run>/ledger.tsv` with the header `stage	finding	validity	readiness	disposition	evidence`.
-   - Done when `<base>`, the spec source, `checks.sh`, the baseline and the ledger exist.
+   - Done when `<base>`, the spec source, the feature list, `checks.sh`, the baseline and the ledger exist.
 
 2. **Pass loop.** A **pass** runs the three stages below in order: simplify, then code review, then QA. Repeat the pass until the exit predicate holds, for at most 3 passes. Number the passes `p1`, `p2`, `p3`. Name each stage `<pass>-<kind>`, such as `p2-code-review`. Every pass reviews the whole branch with `git diff <base>...HEAD`, so later passes also review the fixes that earlier passes applied.
    - **Simplify stage.** Run the **stage loop** with stage kind `simplify`. Producer brief: "Invoke the `simplify` skill on the diff `git diff <base>...HEAD`. Report findings only. Write each finding to `<run>/<stage>.findings.md` with its file, line, the problem and the proposed change."
    - **Code review stage.** Run the **stage loop** with stage kind `code-review`. Producer brief: "Invoke the `code-review` skill. The fixed point is `<base>`. The spec source is `<spec source or 'no spec, skip the Spec axis'>`. If the skill asks for a file you cannot find, such as `docs/agents/issue-tracker.md`, use the spec source given here and continue. Write both reports to `<run>/<stage>.findings.md`."
-   - **QA stage.** Run the **stage loop** with stage kind `qa`. Producer brief: "Invoke the `mm-mode:manual-qa` skill on the change `git diff <base>...HEAD`. The spec source is `<spec source>`. Write the report and evidence under `<run>/<stage>/`. Write the findings to `<run>/<stage>.findings.md`."
+   - **QA stage.** Run the **stage loop** with stage kind `qa`. Producer brief: "Invoke the `mm-mode:manual-qa` skill. The feature list is `<run>/features.md`. The spec source is `<spec source>`. Test from the outside: do not read the source code, the diff or the tests. Write the report and evidence under `<run>/<stage>/`. Write the findings to `<run>/<stage>.findings.md`."
    - If the QA result is `BLOCKED` because of the environment, fix the cause before the retry that the stage loop allows. Examples are a stale volume, a port in use or a missing dependency.
    - **Exit predicate:** one whole pass applies no commit. In that pass, QA returns `PASS` with 0 findings, or `NOT_APPLICABLE`, and the last checks run exits 0 or 2.
    - If pass 3 ends and the predicate is false, stop. Report the open findings and the last QA report.
