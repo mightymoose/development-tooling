@@ -19,24 +19,28 @@ The planner makes every product and interface decision. The slice worker makes o
 
 ## Slice ids and order
 
-A slice id is `<NN>-<name>`. `NN` is a two-digit number. The loop builds the `planned` slices in ascending number.
+A slice id is `s<NN>-<name>`, such as `s03-reject-empty-cart`. `NN` is a two-digit number. The id is also the worker's herdr name, so it matches `[a-z][a-z0-9_-]{0,31}`. The loop builds the `planned` slices in ascending number.
 
 - An id never changes and is never reused.
 - A new slice takes the next unused number.
-- A re-plan can rewrite or drop a slice that is not `done`. To put a new slice before an unfinished one, drop the unfinished one and add its replacement after the new slice.
+- A re-plan runs only when the human directs it. It can rewrite or drop a slice that is not `done`. To put a new slice before an unfinished one, drop the unfinished one and add its replacement after the new slice.
 - A `done` slice is never rewritten. A change to its behavior is a new slice.
 - A slice depends only on `done` slices and on lower numbers.
 
 ## Slice brief
 
-The planner writes one brief per slice to `<run>/slices/<id>.md`. The brief is the only input that the slice worker reads, apart from the files it names. Fill every field. Use literal values.
+The planner writes three files per slice in `<run>/slices/`:
+
+- `<id>.md` is the brief. It is the only input that the slice worker reads, apart from the files it names. Fill every field. Use literal values.
+- `<id>.files` lists every path in the brief's "Files" section, one per line. The slice gate rejects a change to any other file.
+- `<id>.cmd` holds the brief's test command on one line. The slice gate runs it after the commit.
 
 ```markdown
 # <id>
 
-Kind: behavior | refactor | fix
+Kind: behavior | refactor
 Depends on: <slice ids, or none>
-Covers: <the spec lines this slice covers, quoted word for word. A fix slice also names its QA finding.>
+Covers: <the spec lines this slice covers, quoted word for word>
 
 ## Behavior
 <One sentence. What a caller can now do or observe.>
@@ -69,19 +73,18 @@ For a `refactor` slice, replace "Red tests" with "Proof": the existing tests tha
 
 ## Plan check
 
-The plan check has three scopes. The orchestrator names the scope in the checker's brief.
+The plan check has two scopes. The orchestrator names the scope in the checker's brief.
 
 - **full:** the first plan. The proposed slices cover the whole spec.
-- **replan:** the `done` slices in the ledger, plus the proposed slices, cover the whole spec.
-- **qa-fix:** each QA finding has one fix slice. The fix slice's red test reproduces the finding. The fix slice quotes the spec lines that the finding breaks, and the done slices that cover those lines still hold.
+- **replan:** a re-plan the human directed. The `done` slices in the ledger, plus the proposed slices, cover the whole spec.
 
 A plan passes when every line below holds for the proposed slices. The plan checker writes each line that fails as a finding.
 
 - **Coverage.** Coverage holds for the scope. Every proposed slice quotes the lines it covers.
 - **No open decisions.** No brief leaves a product or interface choice open. No brief says "TBD", "handle edge cases", "as needed", "appropriate" or "similar to". No brief names a type, function or file that no slice or existing file defines.
 - **One name per thing.** Every symbol has the same name and signature in every brief that names it, and in the done slices.
-- **Red is real.** Every `behavior` and `fix` slice has red tests with literal expected values and expected failures. The expected values come from the spec, not from the code.
+- **Red is real.** Every `behavior` slice has red tests with literal expected values and expected failures. The expected values come from the spec, not from the code.
 - **Size.** No slice breaks a slice rule above. No slice could split into two slices that each go red alone and stop safely.
-- **Ids and order.** The ids follow the id rules above. Every signature in "Consumes" exists in the code, in a done slice or in a lower-numbered "Produces".
+- **Ids and order.** The ids follow the id rules above. Each slice has its `.files` and `.cmd` files, and they match the brief. Every signature in "Consumes" exists in the code, in a done slice or in a lower-numbered "Produces".
 - **Shared files.** If two slices change the same file, the later slice's brief describes the file as the earlier slice leaves it.
 - **Proportion.** A brief gives decisions, not the whole implementation. A brief that holds the full production code has done the slice's work.
