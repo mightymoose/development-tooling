@@ -162,6 +162,48 @@ test_new_failures_requires_complete_runs() {
   pass "new-failures requires complete runs"
 }
 
+test_recover_stashes_edits_then_rolls_back() {
+  start=$failures
+  local repo run out
+  repo=$(new_repo)
+  run="$repo/.git/mm-mode/harden/t"
+  mkdir -p "$run"
+  cd "$repo"
+  "$HARDEN" begin "$run" p1-qa
+  echo stage > a.txt && git commit --quiet -am "stage commit"
+  echo unfinished > a.txt
+  echo new > untracked.txt
+  if ! out=$("$HARDEN" recover "$run" p1-qa 2>&1); then
+    fail "recover failed: $out"; return
+  fi
+  [ "$(cat a.txt)" = one ] || fail "stage commit not reverted"
+  [ ! -e untracked.txt ] || fail "untracked edit left in the tree"
+  [ -z "$(git status --porcelain)" ] || fail "tree not clean after recover"
+  git stash list | grep -q 'harden-p1-qa' || fail "no named stash"
+  grep -q '^stash: stash@' <<< "$out" || fail "stash not reported"
+  grep -q '^reverted: ' <<< "$out" || fail "reverted commits not reported"
+  git stash show --include-untracked --name-only stash@{0} | grep -qx untracked.txt || fail "stash lost the untracked file"
+  pass "recover stashes edits then rolls back"
+}
+
+test_recover_with_clean_tree_makes_no_stash() {
+  start=$failures
+  local repo run out
+  repo=$(new_repo)
+  run="$repo/.git/mm-mode/harden/t"
+  mkdir -p "$run"
+  cd "$repo"
+  "$HARDEN" begin "$run" p1-qa
+  echo stage > a.txt && git commit --quiet -am "stage commit"
+  out=$("$HARDEN" recover "$run" p1-qa)
+  [ -z "$(git stash list)" ] || fail "stash made for a clean tree"
+  grep -qx 'stash: none' <<< "$out" || fail "missing 'stash: none'"
+  [ "$(cat a.txt)" = one ] || fail "stage commit not reverted"
+  pass "recover with a clean tree makes no stash"
+}
+
+test_recover_stashes_edits_then_rolls_back
+test_recover_with_clean_tree_makes_no_stash
 test_capture_keeps_new_and_staged_files
 test_capture_keeps_committed_edits
 test_new_failures_requires_complete_runs

@@ -8,6 +8,8 @@ The orchestrator (you) keeps only pointers and verdict summaries. Every producer
 
 A **stage** is one producer pass plus its gate: produce findings, review them adversarially, apply what survives, run the checks. The run has three stage kinds: `simplify`, `code-review` and `qa`.
 
+**Recovery.** `<harden> recover <run> <stage>` runs in a fixed order. It saves unfinished edits, untracked files included, in a stash named `harden-<stage>`. It confirms the tree is clean. It reverts the stage commit and every repair commit. Then it prints the stash and the reverted SHAs. Use it for every rollback.
+
 Shell variables do not survive between commands or reach workers. In every brief and every command, write literal values. Below, `<run>` is the absolute run path, `<base>` is the base SHA, and `<harden>` is the absolute path of `scripts/harden.sh` in the mm-mode skill directory.
 
 1. **Pin the run.**
@@ -44,7 +46,7 @@ Run these four steps for each stage. Start a new worker for each of steps A, B a
 **Status gate.** Read a worker's result block before you use anything it wrote.
 - `PASS`: use its output.
 - `NOT_APPLICABLE`: log one ledger row with the reason, and skip the rest of the stage.
-- `BLOCKED`, `FAILED`, or no result block: the output is not usable, even if a findings file exists. Fix the cause if you can, then retry once with a new worker. If the retry is not `PASS`, stop the run. If a fixer left uncommitted changes, save them with `git stash push -u -m harden-<stage>` and name the stash in the report. If the stage already has commits, run `<harden> rollback <run> <stage>` first. Report the stage, the status and the blocker.
+- `BLOCKED`, `FAILED`, or no result block: the output is not usable, even if a findings file exists. Fix the cause if you can, then retry once with a new worker. If the retry is not `PASS`, stop the run. If the stage ran `begin`, run `<harden> recover <run> <stage>` before you stop. Report the stage, the status, the blocker, and the stash and reverted commits that `recover` prints.
 
 **A. Produce.**
 - Make a worktree with `<harden> worktree-add <run> <stage>-produce`. Start a worker in that worktree with the producer brief. Tell it to run every command in the worktree.
@@ -70,5 +72,5 @@ Run these four steps for each stage. Start a new worker for each of steps A, B a
 - Run `bash <run>/checks.sh > <run>/<stage>.checks.txt 2>&1`, then `<harden> new-failures <run>/checks.expected <run>/baseline.txt <run>/<stage>.checks.txt`. Read only its output and the exit code.
 - Exit 0 or 2 passes the gate. Exit 1 means a `NEW` failure. Exit 3 means the checks did not all run.
 - On exit 1 or 3, start a new fixer worker with the checks output path. That fixer adds repair commits. Then run the checks again.
-- If the exit is still 1 or 3, run `<harden> rollback <run> <stage>`. It reverts the stage commit and every repair commit. Log the reverted SHAs.
-- Done when the exit is 0 or 2, or the rollback is logged.
+- If the exit is still 1 or 3, run `<harden> recover <run> <stage>`. Log the stash and reverted SHAs it prints.
+- Done when the exit is 0 or 2, or the recovery is logged.

@@ -5,6 +5,7 @@
 #   harden.sh capture <run> <name>               save every worker edit as a patch, remove the worktree
 #   harden.sh begin <run> <stage>                record HEAD before a stage applies commits
 #   harden.sh rollback <run> <stage>             revert every commit made since begin
+#   harden.sh recover <run> <stage>              stash unfinished edits, then roll back
 #   harden.sh new-failures <expected> <baseline> <current>
 #                                                compare two checks.sh runs
 #
@@ -101,6 +102,25 @@ case "$cmd" in
       done < "$run/$stage.commits"
     fi
     cat "$run/$stage.commits"
+    ;;
+
+  recover)
+    [ $# -eq 2 ] || die "usage: recover <run> <stage>"
+    run=$1 stage=$2
+    [ -f "$run/$stage.pre" ] || die "no begin record for $stage"
+    # 1. Keep unfinished edits, untracked files included, in a named stash.
+    stash=none
+    if [ -n "$(git status --porcelain)" ]; then
+      git stash push --quiet --include-untracked -m "harden-$stage"
+      stash=$(git stash list --format='%gd %gs' | awk -v m="harden-$stage" '$0 ~ m { print $1; exit }')
+    fi
+    # 2. Confirm the tree is clean before touching history.
+    require_clean
+    # 3. Revert the stage commit and every repair commit.
+    reverted=$("$0" rollback "$run" "$stage" | tr '\n' ' ')
+    # 4. Report both.
+    echo "stash: $stash"
+    echo "reverted: ${reverted:-none}"
     ;;
 
   new-failures)
