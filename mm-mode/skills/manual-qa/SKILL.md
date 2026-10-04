@@ -33,8 +33,9 @@ Write `<output dir>/charter.md` with three parts:
 - **Mission:** one sentence about the main thing this change lets a user do.
 - **Main checks:** at least one for each feature in the list. For each one, name the surface (web route, screen, API endpoint, CLI command), the action, and the **oracle**: the expected result and where that expectation comes from (the spec, existing behavior, or common sense).
 - **Risk areas:** where a user is most likely to break each feature. Think about the input it takes, the data it saves and shows, who may use it, and the features next to it in the app.
+- **Edge checks:** the probes from [references/probes.md](references/probes.md) that apply to these risk areas. Each one gets an oracle like a main check. Mark a probe group `n/a` only when it cannot apply to these features, such as input probes for a feature with no input. A missing account, tool or enough time never makes a probe `n/a`.
 
-Done when every feature in the list has at least one main check. If the feature list says the change has no user-facing feature, go to step 8 with status `NOT_APPLICABLE` and the reason.
+Done when every feature in the list has at least one main check, and every probe group is selected or marked `n/a` with a reason. If the feature list says the change has no user-facing feature, go to step 8 with status `NOT_APPLICABLE` and the reason.
 
 ## 2. Find how to run the app
 
@@ -72,10 +73,10 @@ Use the surface's own tools:
 These rules hold for every check in steps 5 and 6:
 
 - **One probe at a time.** Do one action, then observe, then decide the next one.
-- **Watch for silent failures after every action.** Read the browser console, the failed network requests (4xx and 5xx), and the server log. A silent error is a finding even when the screen looks right.
+- **Read every error against the oracle.** After every action, read the browser console, the failed network requests and the server log. Many probes cause errors on purpose, and an error can be the correct result. A 403 for a user without access is correct. A 422 for invalid input is correct, and so is a logged failure when you stopped a dependency. Report a defect when the behavior breaks the oracle. Investigate every error you did not expect, even when the screen looks right.
 - **Prove the lasting effect, not the screen.** After a save, reload the page or fetch the record again through the API. Check side effects too: rows written, emails queued, webhooks sent. A success message alone proves nothing.
 - **Record each check** in `<output dir>/checks.md` as: action, observed result, expected result, `PASS` or `FAIL`, evidence path. Save evidence with the check name in the file name.
-- **A check you could not run is not a pass.** A missing prerequisite, a timeout or a tool error makes it `NOT VERIFIED`, with the reason.
+- **A check you could not run is not a pass.** A missing prerequisite, a timeout or a tool error makes it `NOT VERIFIED`, with the reason. If the check needs something you lack, such as a second account or a role, name it.
 
 ## 5. Prove the main functionality
 
@@ -85,11 +86,11 @@ Done when every main check is `PASS`, `FAIL` or `NOT VERIFIED` with evidence. If
 
 ## 6. Hunt for edge cases
 
-Now attack the risk areas. Use the probe list in [references/probes.md](references/probes.md). Pick the probes that fit this change, and start with the risk areas from the charter.
+Run every edge check from the charter. Start with the risk areas most likely to break.
 
-Keep exploration notes in `<output dir>/notes.md`. For each surprise, write what you observed, your hypothesis, and the next probe that tests it. Follow every surprise until you can explain it or reproduce it as a bug.
+Keep exploration notes in `<output dir>/notes.md`. For each surprise, write what you observed, your hypothesis, and the next probe that tests it. Follow a surprise until you can explain it or reproduce it as a bug, for at most 5 probes. If it is still unexplained after 5, list it as an open investigation with your notes, and move on.
 
-Done when every probe group in the list was tried or marked `n/a` with a reason, and every surprise is explained or filed.
+Done when every edge check is `PASS`, `FAIL` or `NOT VERIFIED` with evidence, and every surprise is explained, filed or listed as open.
 
 ## 7. Confirm, then clean up
 
@@ -109,8 +110,9 @@ Mission: <from the charter>
 | check | kind (main or edge) | surface | result | evidence |
 |-------|---------------------|---------|--------|----------|
 
-Not verified: <each check you could not run, and why>
-Not tried: <each probe group marked n/a, and why>
+Not verified: <each check you could not run, why, and what it needs>
+Not applicable: <each probe group marked n/a, and why>
+Open investigations: <each surprise left unexplained after 5 probes, with a pointer to notes.md>
 ```
 
 Merge duplicate problems into one finding. Write each finding to the findings path:
@@ -135,4 +137,10 @@ Severity:
 
 Report every problem you can prove, not only the first. If you found none, write "no findings" to the findings path.
 
-End with your result block, in the format your brief gives. If the brief gives none, use the lines `status`, `sha`, `artifacts`, `findings` and `blocker`. The status is `PASS` only when every main check ran, whether or not it found problems. The findings count says how many it found. Use `FAILED` if any main check is `NOT VERIFIED`.
+End with your result block, in the format your brief gives. If the brief gives none, use the lines `status`, `sha`, `artifacts`, `findings` and `blocker`. The status depends on whether every check in the charter ran, main and edge alike:
+
+- `PASS`: every check is `PASS` or `FAIL`. The findings count says how many defects you found.
+- `BLOCKED`: a check is `NOT VERIFIED` because you lack something, such as an account, a role or a tool. Name it in the blocker.
+- `FAILED`: a check is `NOT VERIFIED` for any other reason, such as a timeout or a tool error.
+
+Open investigations do not change the status. List them in the report so the reviewer sees them.

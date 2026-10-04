@@ -17,7 +17,7 @@ Shell variables do not survive between commands or reach workers. In every brief
    - Find the base with `git merge-base HEAD origin/main`, or the repo's trunk. Record the SHA as `<base>`.
    - Make the run directory with `git rev-parse --path-format=absolute --git-path mm-mode/harden`, plus a timestamp folder. Record the absolute path as `<run>`. The directory lives inside `.git`, so nothing in it gets committed.
    - Find the spec: an issue number in the branch name or commit messages, or a spec file. If you find none, record "no spec".
-   - Write `<run>/features.md` for black-box QA. List each user-facing feature the branch adds or changes: what a user can now do, and where in the app to find it. Take it from the spec first, then the commit messages, then the names of changed routes and screens. Describe behavior only, with no file names, functions or code. If the branch has no user-facing feature, say so.
+   - Write the feature list for black-box QA with a **feature-list worker**. See the next section. Done when `<run>/features.md` exists.
    - Find the check commands in the target repo: CLAUDE.md, AGENTS.md, package scripts, Makefile, pre-commit config, CI workflow. Pick the unit-test commands and every static check (lint, typecheck, format check).
    - Write `<run>/checks.sh`. It computes the changed files when it runs, with `git diff --name-only <base>...HEAD`, and scopes each check to them where the tool allows.
    - Write the check names, one per line, to `<run>/checks.expected`.
@@ -31,7 +31,7 @@ Shell variables do not survive between commands or reach workers. In every brief
 2. **Pass loop.** A **pass** runs the three stages below in order: simplify, then code review, then QA. Repeat the pass until the exit predicate holds, for at most 3 passes. Number the passes `p1`, `p2`, `p3`. Name each stage `<pass>-<kind>`, such as `p2-code-review`. Every pass reviews the whole branch with `git diff <base>...HEAD`, so later passes also review the fixes that earlier passes applied.
    - **Simplify stage.** Run the **stage loop** with stage kind `simplify`. Producer brief: "Invoke the `simplify` skill on the diff `git diff <base>...HEAD`. Report findings only. Write each finding to `<run>/<stage>.findings.md` with its file, line, the problem and the proposed change."
    - **Code review stage.** Run the **stage loop** with stage kind `code-review`. Producer brief: "Invoke the `code-review` skill. The fixed point is `<base>`. The spec source is `<spec source or 'no spec, skip the Spec axis'>`. If the skill asks for a file you cannot find, such as `docs/agents/issue-tracker.md`, use the spec source given here and continue. Write both reports to `<run>/<stage>.findings.md`."
-   - **QA stage.** Run the **stage loop** with stage kind `qa`. Producer brief: "Invoke the `mm-mode:manual-qa` skill. The feature list is `<run>/features.md`. The spec source is `<spec source>`. Test from the outside: do not read the source code, the diff or the tests. Write the report and evidence under `<run>/<stage>/`. Write the findings to `<run>/<stage>.findings.md`."
+   - **QA stage.** If commits landed after the feature list was written, start a new feature-list worker first. The list must match the branch. Then run the **stage loop** with stage kind `qa`. Producer brief: "Invoke the `mm-mode:manual-qa` skill. The feature list is `<run>/features.md`. The spec source is `<spec source>`. Test from the outside: do not read the source code, the diff or the tests. Write the report and evidence under `<run>/<stage>/`. Write the findings to `<run>/<stage>.findings.md`."
    - If the QA result is `BLOCKED` because of the environment, fix the cause before the retry that the stage loop allows. Examples are a stale volume, a port in use or a missing dependency.
    - **Exit predicate:** one whole pass applies no commit. In that pass, QA returns `PASS` with 0 findings, or `NOT_APPLICABLE`, and the last checks run exits 0 or 2.
    - If pass 3 ends and the predicate is false, stop. Report the open findings and the last QA report.
@@ -39,6 +39,17 @@ Shell variables do not survive between commands or reach workers. In every brief
 3. **Final checks.** Run `bash <run>/checks.sh > <run>/final.txt 2>&1`, then `<harden> new-failures <run>/checks.expected <run>/baseline.txt <run>/final.txt`. Done when it exits 0 or 2. Exit 3 means the checks did not all run, which is never a pass. An `UNRESOLVED` line means a check failed before and after the run, and the run cannot tell whether it got worse. Report it as unresolved, never as "no regression".
 
 **Reply:** one row per stage with findings in, applied, open, considered and dismissed, grouped by pass. Then the QA result per pass, the check status with any `UNRESOLVED` checks, and every `open` and `consider` finding in plain words. Give the run directory path so the user can read the ledger.
+
+#### Feature-list worker
+
+The QA worker never reads code, so this list decides what QA covers. A spec, commit messages and route names can miss a changed rule inside an existing service. An example is a new payment limit with no screen change. This worker reads the real diff so the list misses nothing.
+
+Start a new worker. Brief it: "Read `git diff <base>...HEAD`, the spec source `<spec source>` and the commit messages. Find every change in behavior that a user or an API caller could observe. Include rules that change with no screen change, such as a new limit, a new permission or a changed default. Write two files.
+
+- `<run>/features.md` is for the QA worker. For each behavior, say what a user can now do or what now happens, where in the app to see it, and the expected result. Describe behavior only. Write no file names, function names or code. If the branch changes no observable behavior, say so.
+- `<run>/features.coverage.md` is for the orchestrator. List every changed file that has runtime behavior. Map it to the features it affects, or give the reason it has no observable behavior."
+
+When it returns, apply the status gate. Then check that every file in `features.coverage.md` maps to a feature or has a reason. If one does not, start a new feature-list worker with the gaps named.
 
 #### Stage loop
 
