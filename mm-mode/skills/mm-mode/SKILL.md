@@ -68,4 +68,4 @@ A worker that reports findings always writes its findings file, with "no finding
 | playbook | for |
 |---|---|
 | [harden a change](playbooks/harden.md) | the user asks to harden a branch: review it, QA it and apply the fixes that survive. |
-| [tell a joke](playbooks/tell-a-joke.md) | the user asks for a joke. |
+| [implement a spec](playbooks/implement.md) | the user gives a spec to build: split it into slices, build each slice test first, then QA it. |

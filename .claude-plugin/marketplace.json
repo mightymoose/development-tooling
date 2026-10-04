@@ -8,7 +8,7 @@
     {
       "name": "mm-mode",
       "source": "./mm-mode",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "description": "mightymoose's sticky agent mode for Claude Code. /mm-mode matches each task to a playbook and runs helper skills as the steps need them. Modeled on pstack's poteto-mode.",
       "author": {
         "name": "Ryan Morris",

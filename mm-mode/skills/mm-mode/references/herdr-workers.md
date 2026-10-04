@@ -9,7 +9,7 @@ Run `herdr tab`, `herdr agent` and `herdr pane` without a subcommand to read the
 1. **Name it.** Use `<stage>-<role>`, such as `p1-simplify-produce` or `p2-qa-review`. The name must match `[a-z][a-z0-9_-]{0,31}` and be unique among live agents.
 2. **Write the brief to a file.** Put the full brief in `<run>/<name>.brief.md`. End it with this line: "On every exit, write your result block to `<run>/<name>.result`."
 3. **Make the tab.** Run `herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd <worker directory> --label <name> --no-focus`. The worker directory is the worktree the playbook made, or the repo root if it made none. Record `.result.tab.tab_id` and `.result.root_pane.pane_id`.
-4. **Start Claude.** Run `herdr agent start <name> --kind claude --pane <pane id> -- --permission-mode <mode>`. Use the permission mode the user named. If the user named none, use `auto`. If the start returns `agent_not_ready`, run `herdr agent wait <name> --timeout 60000` before you prompt it.
+4. **Start Claude.** Run `herdr agent start <name> --kind claude --pane <pane id> -- --permission-mode <mode>`. Use the permission mode the user named. If the user named none, use `auto`. If the playbook names a model for the worker, add `--model <model>` after the permission mode. If the start returns `agent_not_ready`, run `herdr agent wait <name> --timeout 60000` before you prompt it.
 5. **Prompt it.** Run `herdr agent prompt <name> "Read <run>/<name>.brief.md and do what it says." --wait --timeout 3600000`.
 
 ## Wait for the result
