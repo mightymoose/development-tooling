@@ -41,12 +41,31 @@ These rules hold for both kinds:
 
 - Start a new worker for each step. Give a fix round or a retry to a new worker with the full brief, not to the worker that ran before.
 - Pass file paths, not file contents. Tell the worker where to write its output.
-- Ask for a short return: a verdict, a path and counts. The detail stays in the files.
+- Paste the result block format below into every brief, and ask for it as the only return. The detail stays in the files.
 - You own the worker's output. Check the real output (the file, the commit, the exit code) before you act on its summary.
+
+### Result block
+
+Every worker ends every exit with the same result block, as its reply and in `<run>/<name>.result`:
+
+```
+status: PASS | NOT_APPLICABLE | BLOCKED | FAILED
+sha: <the HEAD SHA the worker reviewed or produced>
+artifacts: <paths the worker wrote>
+findings: <count, 0 if none>
+blocker: <reason, or - if none>
+```
+
+- `PASS`: the step ran to the end. The findings count says what it found.
+- `NOT_APPLICABLE`: the step had nothing to do, such as QA on a change with no user-facing surface.
+- `BLOCKED`: the step could not run, because of the environment or a missing input.
+- `FAILED`: the step started but could not finish.
+
+A worker that reports findings always writes its findings file, with "no findings" if the count is 0. Workers do not modify repository source unless their brief says to apply fixes. They write only the requested artifacts.
 
 ## Playbooks
 
 | playbook | for |
 |---|---|
-| [harden a change](playbooks/harden.md) | the user asks to harden, polish, review or QA a branch before a PR. |
+| [harden a change](playbooks/harden.md) | the user asks to harden a branch: review it, QA it and apply the fixes that survive. |
 | [tell a joke](playbooks/tell-a-joke.md) | the user asks for a joke. |

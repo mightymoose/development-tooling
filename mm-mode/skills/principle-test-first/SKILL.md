@@ -15,4 +15,4 @@ Every change to behavior starts with a test that fails. The code then changes to
 - **Vertical slices, not horizontal ones.** Write one test, then its code, then the next test. Each test is a tracer bullet that shows where the next one should go. A batch of tests written up front tests imagined behavior and locks in a test structure before you understand the code.
 - **Bugs start as a failing test** that reproduces them.
 - **Name tests in the domain's words.** A test name says what the code does for its user, such as "user can check out with a valid cart". If the repo has a `CONTEXT.md` or a glossary, use its terms.
-- **Refactor outside the loop.** The loop only goes red, then green. Clean up the structure later, in review, while every test stays green. A pure refactor, a docs change or a config change needs no new test.
+- **Refactor outside the loop.** The loop only goes red, then green. Clean up the structure later, in review, while every test stays green. A pure refactor or a docs change needs no new test. A config change that changes behavior does need one.

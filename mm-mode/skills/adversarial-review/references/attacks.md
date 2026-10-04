@@ -10,7 +10,7 @@ The producer claims the code can be simpler, can reuse something, or can run fas
 - **Reuse.** If it says "reuse X", does X exist, and does X handle every case the current code handles? Open X and compare.
 - **Reach.** Does the change touch code outside the diff? If it does, it needs a stronger reason.
 - **Net gain.** Count the lines, layers and names before and after. A change that moves complexity without removing it is `REJECTED`.
-- **Tests.** Do the existing tests cover the lines it changes? If none do, lower the confidence.
+- **Tests.** Does a test exercise the behavior that the change touches? Coverage of the lines alone is not enough. If no test does, the fix is at most `RISKY`.
 
 ## code-review
 
@@ -29,4 +29,4 @@ The producer claims the running app misbehaves.
 - **Reproduce.** Read the repro steps and the evidence (screenshot, response body, log). Does the evidence show the claimed failure? A finding with no evidence is at most `PLAUSIBLE`.
 - **Cause.** Is the failure caused by this change? Check whether the same path fails on the base commit from the diff command. Use a worktree at the base only if the check is cheap. A failure that also exists on the base goes to `noted`, with a note that it predates the change.
 - **Environment.** Could a stale environment cause it: an old volume, cached data, a wrong branch, a port held by another process? If the evidence points there, the finding is `REJECTED` and the reason names the environment fix.
-- **Spec.** Does the spec say what the right behavior is? If the spec is silent and the behavior is a product choice, put the finding in `consider` and say it needs a human decision.
+- **Spec.** Does the spec say what the right behavior is? If the spec is silent and the behavior is a product choice, set readiness to `RISKY` and say it needs a human decision. The finding then stays open.
